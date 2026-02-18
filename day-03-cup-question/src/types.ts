@@ -23,6 +23,15 @@ export interface Config {
 }
 
 /**
+ * Результат запроса к Chat Completion API
+ */
+export interface ChatCompletionResult {
+  content: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/**
  * Результат выполнения стратегии
  */
 export interface StrategyResult {
@@ -30,6 +39,8 @@ export interface StrategyResult {
   prompt: string;
   response: string;
   executionTimeMs: number;
+  inputTokens: number;
+  outputTokens: number;
 }
 
 /**
@@ -50,6 +61,6 @@ export type { OpenAI } from 'openai';
  * Интерфейс для OpenAI клиента
  */
 export interface OpenAIClient {
-  chatCompletion(prompt: string): Promise<string>;
+  chatCompletion(prompt: string): Promise<ChatCompletionResult>;
   getModel(): string;
 }

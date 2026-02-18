@@ -50,12 +50,13 @@ function printSummary(writer: OutputWriter, results: StrategyResult[]): void {
   writer.writeSeparator('#', 60);
   writer.writeLine();
   
-  writer.writeLine('| Стратегия | Время |');
-  writer.writeLine('|-----------|-------|');
+  writer.writeLine('| Стратегия | Время | Входные токены | Выходные токены | Всего токенов |');
+  writer.writeLine('|-----------|-------|---------------|-----------------|---------------|');
   
   for (const result of results) {
     const time = formatTime(result.executionTimeMs);
-    writer.writeLine(`| ${result.strategyName} | ${time} |`);
+    const total = result.inputTokens + result.outputTokens;
+    writer.writeLine(`| ${result.strategyName} | ${time} | ${result.inputTokens} | ${result.outputTokens} | ${total} |`);
   }
   
   writer.writeLine();

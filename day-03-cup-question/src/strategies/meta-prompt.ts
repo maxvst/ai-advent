@@ -19,10 +19,10 @@ export class MetaPromptStrategy implements PromptingStrategy {
     const startTime = Date.now();
     
     // Получаем оптимизированный промпт от модели
-    const generatedPrompt = await client.chatCompletion(metaPrompt);
+    const metaResult = await client.chatCompletion(metaPrompt);
     
     // Шаг 2: Используем созданный промпт для решения задачи
-    const response = await client.chatCompletion(generatedPrompt);
+    const finalResult = await client.chatCompletion(metaResult.content);
     
     const executionTimeMs = Date.now() - startTime;
 
@@ -31,16 +31,18 @@ export class MetaPromptStrategy implements PromptingStrategy {
 ${metaPrompt}
 
 === Ответ модели (сгенерированный промпт) ===
-${generatedPrompt}
+${metaResult.content}
 
 === ШАГ 2: Решение с использованием промпта ===
-${generatedPrompt}`;
+${metaResult.content}`;
 
     return {
       strategyName: this.name,
       prompt: fullPrompt,
-      response,
+      response: finalResult.content,
       executionTimeMs,
+      inputTokens: metaResult.inputTokens + finalResult.inputTokens,
+      outputTokens: metaResult.outputTokens + finalResult.outputTokens,
     };
   }
 }

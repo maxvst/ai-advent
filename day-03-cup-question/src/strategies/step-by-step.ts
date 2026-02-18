@@ -14,14 +14,16 @@ export class StepByStepStrategy implements PromptingStrategy {
 Пожалуйста, решай эту задачу пошагово, объясняя каждый шаг.`;
 
     const startTime = Date.now();
-    const response = await client.chatCompletion(prompt);
+    const result = await client.chatCompletion(prompt);
     const executionTimeMs = Date.now() - startTime;
 
     return {
       strategyName: this.name,
       prompt,
-      response,
+      response: result.content,
       executionTimeMs,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
     };
   }
 }

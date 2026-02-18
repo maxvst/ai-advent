@@ -12,14 +12,16 @@ export class DirectStrategy implements PromptingStrategy {
     const prompt = task;
     
     const startTime = Date.now();
-    const response = await client.chatCompletion(prompt);
+    const result = await client.chatCompletion(prompt);
     const executionTimeMs = Date.now() - startTime;
 
     return {
       strategyName: this.name,
       prompt,
-      response,
+      response: result.content,
       executionTimeMs,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
     };
   }
 }
