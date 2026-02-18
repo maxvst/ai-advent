@@ -1,0 +1,25 @@
+# Config with sensitive data
+config.json
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Output files
+results.md
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

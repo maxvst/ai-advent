@@ -1,0 +1,10 @@
+{
+  "openai": {
+    "apiKey": "YOUR_API_KEY_HERE",
+    "model": "deepseek/deepseek-v3.2",
+    "baseUrl": "https://openrouter.ai/api/v1"
+  },
+  "task": {
+    "description": "Есть две ёмкости: 5 литров и 3 литра. Как отмерить ровно 4 литра воды, используя только эти ёмкости? Воды неограниченное количество."
+  }
+}
