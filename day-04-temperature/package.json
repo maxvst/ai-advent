@@ -1,0 +1,23 @@
+{
+  "name": "day-04-temperature",
+  "version": "1.0.0",
+  "description": "Приложение для демонстрации влияния температуры на ответы LLM",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["openai", "llm", "temperature"],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "openai": "^6.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
