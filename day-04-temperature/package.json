@@ -1,23 +1,27 @@
 {
-  "name": "day-04-temperature",
+  "name": "llm-temperature-comparison",
   "version": "1.0.0",
-  "description": "Приложение для демонстрации влияния температуры на ответы LLM",
-  "main": "src/index.ts",
+  "description": "Приложение для сравнения ответов LLM с разной температурой",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "ts-node src/index.ts",
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
   },
-  "keywords": ["openai", "llm", "temperature"],
+  "keywords": [
+    "openai",
+    "llm",
+    "temperature",
+    "typescript"
+  ],
   "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "license": "MIT",
   "dependencies": {
-    "openai": "^6.22.0"
+    "openai": "^4.77.0"
   },
   "devDependencies": {
-    "@types/node": "^25.3.0",
+    "@types/node": "^22.10.5",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.7.3"
   }
 }

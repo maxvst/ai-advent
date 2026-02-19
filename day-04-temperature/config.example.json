@@ -1,0 +1,16 @@
+{
+  "openai": {
+    "apiKey": "YOUR_API_KEY_HERE",
+    "model": "gpt-3.5-turbo",
+    "baseUrl": "https://api.openai.com/v1"
+  },
+  "request": {
+    "prompt": "Объясни квантовую физику простыми словами",
+    "temperatures": [0, 0.7, 1.2],
+    "maxTokens": 1000
+  },
+  "output": {
+    "directory": "./output",
+    "filename": "results.md"
+  }
+}

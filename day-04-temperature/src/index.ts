@@ -1,113 +1,229 @@
 import OpenAI from 'openai';
 import * as fs from 'fs';
 import * as path from 'path';
-import apiConfig from './config/api';
-import prompt from './prompt';
 
-/**
- * Интерфейс для результата запроса
- */
-interface QueryResult {
+// Интерфейсы для типизации конфигурации
+interface OpenAIConfig {
+  apiKey: string;
+  model: string;
+  baseUrl: string;
+}
+
+interface RequestConfig {
+  prompt: string;
+  temperatures: number[];
+  maxTokens: number;
+}
+
+interface OutputConfig {
+  directory: string;
+  filename: string;
+}
+
+interface Config {
+  openai: OpenAIConfig;
+  request: RequestConfig;
+  output: OutputConfig;
+}
+
+// Интерфейс для хранения результата
+interface Result {
   temperature: number;
   response: string;
   timestamp: string;
 }
 
 /**
- * Интерфейс для всех результатов
+ * Загружает конфигурацию из JSON файла
  */
-interface AllResults {
-  prompt: string;
-  model: string;
-  results: QueryResult[];
+function loadConfig(): Config {
+  const configPath = path.join(__dirname, '..', 'config.json');
+  
+  if (!fs.existsSync(configPath)) {
+    throw new Error(
+      `Конфигурационный файл не найден: ${configPath}\n` +
+      'Пожалуйста, создайте config.json на основе примера.'
+    );
+  }
+
+  const configData = fs.readFileSync(configPath, 'utf-8');
+  return JSON.parse(configData) as Config;
 }
 
 /**
- * Отправка запроса к OpenAI с заданной температурой
+ * Создает экземпляр OpenAI клиента
  */
-async function sendQuery(client: OpenAI, temperature: number): Promise<QueryResult> {
-  console.log(`\n📊 Запрос с температурой ${temperature}...`);
-  
+function createOpenAIClient(config: OpenAIConfig): OpenAI {
+  if (config.apiKey === 'YOUR_API_KEY_HERE') {
+    throw new Error(
+      'Пожалуйста, укажите ваш API ключ в config.json\n' +
+      'Получить ключ можно на: https://platform.openai.com/api-keys'
+    );
+  }
+
+  return new OpenAI({
+    apiKey: config.apiKey,
+    baseURL: config.baseUrl,
+  });
+}
+
+/**
+ * Отправляет запрос к OpenAI API с указанной температурой
+ */
+async function sendRequest(
+  client: OpenAI,
+  model: string,
+  prompt: string,
+  temperature: number,
+  maxTokens: number
+): Promise<string> {
+  console.log(`\n🔄 Отправка запроса с температурой ${temperature}...`);
+
   const response = await client.chat.completions.create({
-    model: apiConfig.model,
-    messages: [{ role: 'user', content: prompt }],
+    model: model,
+    messages: [
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ],
     temperature: temperature,
-    max_tokens: apiConfig.maxTokens,
+    max_tokens: maxTokens,
   });
 
-  const result: QueryResult = {
-    temperature,
-    response: response.choices[0]?.message?.content || 'Нет ответа',
-    timestamp: new Date().toISOString(),
-  };
-
-  return result;
+  return response.choices[0]?.message?.content || 'Пустой ответ от API';
 }
 
 /**
- * Сохранение результатов в файл
+ * Выводит результат на экран
  */
-function saveResults(results: AllResults): void {
-  const filePath = path.join(process.cwd(), 'results.json');
-  fs.writeFileSync(filePath, JSON.stringify(results, null, 2), 'utf-8');
-  console.log(`\n💾 Результаты сохранены в файл: ${filePath}`);
+function displayResult(temperature: number, response: string): void {
+  console.log('\n' + '='.repeat(60));
+  console.log(`📊 ТЕМПЕРАТУРА: ${temperature}`);
+  console.log('='.repeat(60));
+  console.log(response);
+  console.log('='.repeat(60));
 }
 
 /**
- * Основная функция
+ * Формирует Markdown содержимое для сохранения
+ */
+function formatMarkdownResults(
+  prompt: string,
+  model: string,
+  results: Result[]
+): string {
+  const timestamp = new Date().toISOString();
+  
+  let markdown = `# Результаты запросов к LLM с разной температурой
+
+**Запрос:** ${prompt}
+
+**Модель:** ${model}
+
+**Дата генерации:** ${timestamp}
+
+---
+
+`;
+
+  for (const result of results) {
+    markdown += `## Температура: ${result.temperature}
+
+**Ответ:**
+
+${result.response}
+
+---
+
+`;
+  }
+
+  markdown += `*Дата генерации: ${timestamp}*\n`;
+  
+  return markdown;
+}
+
+/**
+ * Сохраняет результаты в Markdown файл
+ */
+function saveResults(
+  outputConfig: OutputConfig,
+  prompt: string,
+  model: string,
+  results: Result[]
+): void {
+  // Создаем директорию, если не существует
+  const outputDir = path.join(__dirname, '..', outputConfig.directory);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  // Формируем и сохраняем Markdown
+  const markdown = formatMarkdownResults(prompt, model, results);
+  const outputPath = path.join(outputDir, outputConfig.filename);
+  
+  fs.writeFileSync(outputPath, markdown, 'utf-8');
+  console.log(`\n✅ Результаты сохранены в файл: ${outputPath}`);
+}
+
+/**
+ * Основная функция приложения
  */
 async function main(): Promise<void> {
-  console.log('🚀 Запуск приложения для демонстрации влияния температуры');
-  console.log(`📝 Промпт: "${prompt}"`);
-  console.log(`🤖 Модель: ${apiConfig.model}`);
-  
-  // Проверка API ключа
-  if (apiConfig.apiKey === 'YOUR_API_KEY_HERE' || !apiConfig.apiKey) {
-    console.error('❌ Ошибка: API ключ не настроен!');
-    console.log('   Пожалуйста, заполните src/config/api.ts или установите переменную окружения OPENAI_API_KEY');
+  console.log('🚀 Запуск приложения LLM Temperature Comparison\n');
+
+  try {
+    // 1. Загрузка конфигурации
+    console.log('📁 Загрузка конфигурации...');
+    const config = loadConfig();
+    console.log(`   ✓ Модель: ${config.openai.model}`);
+    console.log(`   ✓ Запрос: ${config.request.prompt}`);
+    console.log(`   ✓ Температуры: ${config.request.temperatures.join(', ')}`);
+
+    // 2. Создание OpenAI клиента
+    console.log('\n🔌 Инициализация OpenAI клиента...');
+    const client = createOpenAIClient(config.openai);
+    console.log('   ✓ Клиент создан успешно');
+
+    // 3. Отправка запросов с разными температурами
+    const results: Result[] = [];
+    
+    for (const temperature of config.request.temperatures) {
+      const response = await sendRequest(
+        client,
+        config.openai.model,
+        config.request.prompt,
+        temperature,
+        config.request.maxTokens
+      );
+
+      // Вывод на экран
+      displayResult(temperature, response);
+
+      // Сохранение результата
+      results.push({
+        temperature,
+        response,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // 4. Сохранение всех результатов в файл
+    saveResults(
+      config.output,
+      config.request.prompt,
+      config.openai.model,
+      results
+    );
+
+    console.log('\n🎉 Работа завершена успешно!');
+
+  } catch (error) {
+    console.error('\n❌ Ошибка:', error instanceof Error ? error.message : error);
     process.exit(1);
   }
-
-  // Инициализация клиента OpenAI
-  const openai = new OpenAI({
-    apiKey: apiConfig.apiKey,
-    baseURL: apiConfig.baseURL,
-  });
-
-  // Температуры для тестирования
-  const temperatures = [0, 0.7, 1.2];
-  
-  const results: QueryResult[] = [];
-
-  // Отправляем запросы с разными температурами
-  for (const temp of temperatures) {
-    try {
-      const result = await sendQuery(openai, temp);
-      results.push(result);
-      
-      // Вывод ответа в консоль
-      console.log(`\n📌 Ответ (температура = ${temp}):`);
-      console.log('─'.repeat(50));
-      console.log(result.response);
-      console.log('─'.repeat(50));
-      
-    } catch (error) {
-      console.error(`❌ Ошибка при запросе с температурой ${temp}:`, error);
-    }
-  }
-
-  // Формирование итогового объекта
-  const allResults: AllResults = {
-    prompt,
-    model: apiConfig.model,
-    results,
-  };
-
-  // Сохранение в файл
-  saveResults(allResults);
-
-  console.log('\n✅ Все запросы выполнены!');
 }
 
-// Запуск
-main().catch(console.error);
+// Запуск приложения
+main();
