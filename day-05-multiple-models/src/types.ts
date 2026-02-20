@@ -123,6 +123,19 @@ export interface ChatMessage {
   content: string;
 }
 
+/**
+ * Интерфейс для API клиента (для поддержки моков)
+ */
+export interface IApiClient {
+  sendRequest(modelId: string, messages: ChatMessage[]): Promise<unknown>;
+  sendRequestWithTiming(modelId: string, messages: ChatMessage[]): Promise<{ 
+    response: unknown; 
+    responseTimeMs: number 
+  }>;
+  extractContent(response: unknown): string;
+  extractUsage(response: unknown): TokenUsage;
+}
+
 // ==================== Утилиты ====================
 
 export type ModelLevel = 'strong' | 'medium' | 'weak';

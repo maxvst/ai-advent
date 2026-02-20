@@ -3,12 +3,13 @@
  */
 
 import OpenAI from 'openai';
-import { Config, ChatMessage } from './types';
+import { Config, ChatMessage, IApiClient, TokenUsage } from './types';
+import { MockApiClient } from './api-mock';
 
 /**
  * Класс для работы с API
  */
-export class ApiClient {
+export class ApiClient implements IApiClient {
   private client: OpenAI;
   private maxRetries: number;
   private retryDelayMs: number;
@@ -182,4 +183,25 @@ export function extractUsage(
   response: OpenAI.Chat.Completions.ChatCompletion
 ): { inputTokens: number; outputTokens: number } {
   return getClient().extractUsage(response);
+}
+
+// ==================== Фабрика API клиентов ====================
+
+/**
+ * Проверить, включён ли режим моков
+ */
+export function isMockMode(): boolean {
+  return process.env.USE_MOCK_API === 'true' || process.env.USE_MOCK_API === '1';
+}
+
+/**
+ * Создать API клиент (реальный или мок)
+ */
+export function createApiClient(config: Config): IApiClient {
+  if (isMockMode()) {
+    console.log('📋 Используется MOCK режим API (тестовые данные)\n');
+    return new MockApiClient(100); // 100ms задержка для реалистичности
+  }
+  
+  return ApiClient.fromConfig(config);
 }

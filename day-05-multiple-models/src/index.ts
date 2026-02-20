@@ -9,9 +9,9 @@
  * 5. Сохраняет результаты в Markdown
  */
 
-import { Config, ModelResponse, ModelComparison, ModelConfig, AnonymizationResult } from './types';
+import { Config, ModelResponse, ModelComparison, ModelConfig, AnonymizationResult, IApiClient } from './types';
 import { loadConfig, getModelsList } from './config';
-import { ApiClient } from './api';
+import { ApiClient, createApiClient } from './api';
 import { getModelResponse, anonymizeResponses, getModelComparison, getFinalConclusion } from './compare';
 import { createReport, saveReport, printReport } from './report';
 import { 
@@ -28,7 +28,7 @@ import {
  * Обработать одну модель - получить и вывести ответ
  */
 async function processModel(
-  apiClient: ApiClient,
+  apiClient: IApiClient,
   modelConfig: ModelConfig,
   level: 'strong' | 'medium' | 'weak',
   question: string
@@ -46,7 +46,7 @@ async function processModel(
  * Получить сравнения от всех моделей
  */
 async function processComparisons(
-  apiClient: ApiClient,
+  apiClient: IApiClient,
   config: Config,
   responses: ModelResponse[],
   anonymizationResult: AnonymizationResult
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
     
     // 2. Инициализируем API клиент
     stage('🔌', 'Инициализация API клиента...');
-    const apiClient = ApiClient.fromConfig(config);
+    const apiClient = createApiClient(config);
     
     // 3. Получаем ответы от всех моделей
     stage('📝', 'Отправка вопроса моделям...');

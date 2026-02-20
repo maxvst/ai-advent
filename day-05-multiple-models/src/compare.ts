@@ -12,9 +12,9 @@ import {
   AnonymizationMapping,
   ChatMessage,
   FinalConclusion,
-  ResponseRating
+  ResponseRating,
+  IApiClient
 } from './types';
-import { ApiClient } from './api';
 import { calculateCost } from './metrics';
 import { createComparisonPrompt, createFinalConclusionPrompt, parseAllRatings } from './prompts';
 
@@ -22,7 +22,7 @@ import { createComparisonPrompt, createFinalConclusionPrompt, parseAllRatings } 
  * Получить ответ от модели
  */
 export async function getModelResponse(
-  apiClient: ApiClient,
+  apiClient: IApiClient,
   modelConfig: ModelConfig,
   modelLevel: ModelLevel,
   question: string
@@ -99,7 +99,7 @@ export function anonymizeResponses(responses: ModelResponse[]): AnonymizationRes
  * Модель оценивает все три ответа и возвращает оценки для каждого
  */
 export async function getModelComparison(
-  apiClient: ApiClient,
+  apiClient: IApiClient,
   modelConfig: ModelConfig,
   modelLevel: ModelLevel,
   question: string,
@@ -153,7 +153,7 @@ export async function getModelComparison(
  * Получить финальный вывод от сильной модели
  */
 export async function getFinalConclusion(
-  apiClient: ApiClient,
+  apiClient: IApiClient,
   strongModel: ModelConfig,
   question: string,
   responses: ModelResponse[],
