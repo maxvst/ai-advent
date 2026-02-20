@@ -9,7 +9,7 @@
  * 5. Сохраняет результаты в Markdown
  */
 
-import { Config, ModelResponse, ModelComparison, ModelConfig } from './types';
+import { Config, ModelResponse, ModelComparison, ModelConfig, AnonymizationResult } from './types';
 import { loadConfig, getModelsList } from './config';
 import { ApiClient } from './api';
 import { getModelResponse, anonymizeResponses, getModelComparison, getFinalConclusion } from './compare';
@@ -49,7 +49,7 @@ async function processComparisons(
   apiClient: ApiClient,
   config: Config,
   responses: ModelResponse[],
-  anonymized: { number: number; content: string }[]
+  anonymizationResult: AnonymizationResult
 ): Promise<ModelComparison[]> {
   const comparisons: ModelComparison[] = [];
   const models = getModelsList(config);
@@ -62,10 +62,10 @@ async function processComparisons(
       model.config,
       model.level,
       config.question,
-      anonymized
+      anonymizationResult.responses
     );
     
-    printComparison(comparison);
+    printComparison(comparison, anonymizationResult.mapping);
     
     comparisons.push(comparison);
   }
@@ -107,11 +107,11 @@ async function main(): Promise<void> {
     
     // 4. Анонимизируем ответы
     stage('🔒', 'Анонимизация ответов...');
-    const anonymized = anonymizeResponses(responses);
+    const anonymizationResult = anonymizeResponses(responses);
     
     // 5. Получаем сравнение от каждой модели
     stage('📊', 'Получение оценок качества...');
-    const comparisons = await processComparisons(apiClient, config, responses, anonymized);
+    const comparisons = await processComparisons(apiClient, config, responses, anonymizationResult);
     
     // 6. Получаем итоговый вывод от сильной модели
     stage('🏆', 'Получение итогового вывода от сильной модели...');
@@ -120,7 +120,8 @@ async function main(): Promise<void> {
       config.models.strong,
       config.question,
       responses,
-      comparisons
+      comparisons,
+      anonymizationResult.mapping
     );
     
     printFinalConclusion(finalConclusion);
@@ -133,7 +134,7 @@ async function main(): Promise<void> {
     printReport(report);
     
     // 9. Сохраняем в файл
-    const savedPath = await saveReport(report, config.outputDir);
+    const savedPath = await saveReport(report, config.outputDir, anonymizationResult.mapping);
     success(`Отчёт сохранён: ${savedPath}`);
     
     console.log('\n✨ Сравнение завершено успешно!\n');

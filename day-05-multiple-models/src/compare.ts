@@ -8,12 +8,15 @@ import {
   ModelComparison, 
   ModelLevel,
   AnonymizedResponse,
+  AnonymizationResult,
+  AnonymizationMapping,
   ChatMessage,
-  FinalConclusion
+  FinalConclusion,
+  ResponseRating
 } from './types';
 import { ApiClient } from './api';
 import { calculateCost } from './metrics';
-import { createComparisonPrompt, createFinalConclusionPrompt } from './prompts';
+import { createComparisonPrompt, createFinalConclusionPrompt, parseAllRatings } from './prompts';
 
 /**
  * Получить ответ от модели
@@ -52,20 +55,48 @@ export async function getModelResponse(
 }
 
 /**
- * Анонимизировать ответы для сравнения
+ * Анонимизировать ответы для сравнения с сохранением маппинга
  */
-export function anonymizeResponses(responses: ModelResponse[]): AnonymizedResponse[] {
-  // Перемешиваем порядок для анонимности
-  const shuffled = [...responses].sort(() => Math.random() - 0.5);
+export function anonymizeResponses(responses: ModelResponse[]): AnonymizationResult {
+  // Создаём массив индексов и перемешиваем их
+  const indices = responses.map((_, i) => i);
   
-  return shuffled.map((response, index) => ({
-    number: index + 1,
-    content: response.content
-  }));
+  // Алгоритм Fisher-Yates для честного перемешивания
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  
+  // Создаём анонимизированные ответы и маппинг
+  const anonymizedResponses: AnonymizedResponse[] = [];
+  const mapping: AnonymizationMapping[] = [];
+  
+  for (let i = 0; i < indices.length; i++) {
+    const originalIndex = indices[i];
+    const originalResponse = responses[originalIndex];
+    
+    anonymizedResponses.push({
+      number: i + 1,
+      content: originalResponse.content
+    });
+    
+    mapping.push({
+      anonymizedNumber: i + 1,
+      modelId: originalResponse.modelId,
+      modelName: originalResponse.modelName,
+      modelLevel: originalResponse.modelLevel
+    });
+  }
+  
+  return {
+    responses: anonymizedResponses,
+    mapping
+  };
 }
 
 /**
  * Получить сравнение от модели (анонимное)
+ * Модель оценивает все три ответа и возвращает оценки для каждого
  */
 export async function getModelComparison(
   apiClient: ApiClient,
@@ -89,16 +120,26 @@ export async function getModelComparison(
   );
 
   const content = apiClient.extractContent(apiResponse);
+  
+  // Парсим оценки из ответа модели
+  const parsedRatings = parseAllRatings(content);
+  
+  // Преобразуем в массив ResponseRating
+  const ratings: ResponseRating[] = [];
+  for (let i = 1; i <= 3; i++) {
+    const parsed = parsedRatings.get(i);
+    ratings.push({
+      responseNumber: i,
+      score: parsed?.score ?? 0,
+      analysis: parsed?.analysis ?? ''
+    });
+  }
 
   return {
     modelId: modelConfig.id,
     modelName: modelConfig.name,
     modelLevel,
-    responseNumber: 0,
-    rating: {
-      score: 0,
-      analysis: content
-    }
+    ratings
   };
 }
 
@@ -110,9 +151,10 @@ export async function getFinalConclusion(
   strongModel: ModelConfig,
   question: string,
   responses: ModelResponse[],
-  comparisons: ModelComparison[]
+  comparisons: ModelComparison[],
+  mapping: AnonymizationMapping[]
 ): Promise<FinalConclusion> {
-  const prompt = createFinalConclusionPrompt(question, responses, comparisons);
+  const prompt = createFinalConclusionPrompt(question, responses, comparisons, mapping);
   
   const messages: ChatMessage[] = [
     {

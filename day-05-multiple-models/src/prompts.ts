@@ -2,7 +2,7 @@
  * Модуль для создания промптов
  */
 
-import { ModelResponse, ModelComparison, AnonymizedResponse } from './types';
+import { ModelResponse, ModelComparison, AnonymizedResponse, AnonymizationMapping } from './types';
 
 /**
  * Создать промпт для сравнения ответов
@@ -55,20 +55,26 @@ ${responsesText}
 export function createFinalConclusionPrompt(
   question: string,
   responses: ModelResponse[],
-  comparisons: ModelComparison[]
+  comparisons: ModelComparison[],
+  mapping: AnonymizationMapping[]
 ): string {
-  // Создаём анонимизированные данные для анализа
-  const responsesData = responses.map((r, i) => ({
-    number: i + 1,
-    content: r.content,
-    time: r.responseTimeMs,
-    inputTokens: r.usage.inputTokens,
-    outputTokens: r.usage.outputTokens,
-    cost: r.cost
-  }));
+  // Создаём данные для анализа с восстановленными именами моделей
+  const responsesData = responses.map((r, i) => {
+    const mapInfo = mapping.find(m => m.modelId === r.modelId);
+    return {
+      number: mapInfo?.anonymizedNumber ?? i + 1,
+      modelName: r.modelName,
+      modelLevel: r.modelLevel,
+      content: r.content,
+      time: r.responseTimeMs,
+      inputTokens: r.usage.inputTokens,
+      outputTokens: r.usage.outputTokens,
+      cost: r.cost
+    };
+  });
 
   const responsesText = responsesData
-    .map(r => `### Ответ ${r.number}
+    .map(r => `### Ответ ${r.number} (${r.modelName} - ${r.modelLevel})
 - Время ответа: ${r.time}мс
 - Токены: ${r.inputTokens} input, ${r.outputTokens} output
 - Стоимость: $${r.cost.toFixed(6)}
@@ -76,9 +82,33 @@ export function createFinalConclusionPrompt(
 ${r.content}`)
     .join('\n\n---\n\n');
 
-  const comparisonsText = comparisons
-    .map((c, i) => `### Оценка от Модели ${i + 1}
-${c.rating.analysis}`)
+  // Группируем оценки по ответам
+  const ratingsByResponse = new Map<number, Array<{ evaluator: string; score: number; analysis: string }>>();
+  
+  for (const comparison of comparisons) {
+    for (const rating of comparison.ratings) {
+      if (!ratingsByResponse.has(rating.responseNumber)) {
+        ratingsByResponse.set(rating.responseNumber, []);
+      }
+      ratingsByResponse.get(rating.responseNumber)!.push({
+        evaluator: comparison.modelName,
+        score: rating.score,
+        analysis: rating.analysis
+      });
+    }
+  }
+
+  const ratingsText = Array.from(ratingsByResponse.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([num, ratings]) => {
+      const mapInfo = mapping.find(m => m.anonymizedNumber === num);
+      const avgScore = (ratings.reduce((sum, r) => sum + r.score, 0) / ratings.length).toFixed(1);
+      return `### Оценки для Ответа ${num} (${mapInfo?.modelName ?? 'Неизвестно'})
+- Средняя оценка: ${avgScore}/10
+- Оценки от моделей: ${ratings.map(r => `${r.evaluator}: ${r.score}/10`).join(', ')}
+- Анализы:
+${ratings.map(r => `  - ${r.evaluator}: ${r.analysis.substring(0, 150)}...`).join('\n')}`;
+    })
     .join('\n\n');
 
   return `Вы - эксперт по анализу качества языковых моделей. Вам предоставлены данные о трёх моделях, ответивших на один и тот же вопрос.
@@ -87,24 +117,24 @@ ${c.rating.analysis}`)
 
 ---
 
-## Ответы моделей (анонимизированы):
+## Ответы моделей:
 
 ${responsesText}
 
 ---
 
-## Оценки качества (от других моделей):
+## Оценки качества:
 
-${comparisonsText}
+${ratingsText}
 
 ---
 
 **Задание:**
 Проанализируйте все данные и сделайте итоговый вывод:
-1. Какой ответ (1, 2 или 3) является наиболее качественным и почему?
-2. Какой ответ показывает лучшее соотношение качество/стоимость?
-3. Какие ключевые различия вы заметили между ответами?
-4. Общие выводы о различиях в работе моделей разного уровня.
+1. Какая модель показала наиболее качественный ответ и почему?
+2. Какая модель показывает лучшее соотношение качество/стоимость?
+3. Какие ключевые различия вы заметили между ответами моделей разного уровня?
+4. Общие выводы о различиях в работе моделей.
 
 Дайте развёрнутый анализ, опираясь на конкретные примеры из ответов.`;
 }

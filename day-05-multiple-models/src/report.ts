@@ -4,13 +4,13 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { Report, ModelResponse, ModelComparison } from './types';
+import { Report, ModelResponse, ModelComparison, AnonymizationMapping } from './types';
 import { formatCost, formatTime, formatTokens, calculateSummary } from './metrics';
 
 /**
  * Сгенерировать Markdown отчёт
  */
-export function generateMarkdownReport(report: Report): string {
+export function generateMarkdownReport(report: Report, mapping?: AnonymizationMapping[]): string {
   const lines: string[] = [];
   
   // Заголовок
@@ -57,15 +57,63 @@ export function generateMarkdownReport(report: Report): string {
   lines.push('Модели оценивали ответы анонимно (без знания автора).');
   lines.push('');
   
-  for (const comparison of report.comparisons) {
-    lines.push(`### Оценка от ${comparison.modelName}`);
-    lines.push('');
-    lines.push(`**Оценка:** ${comparison.rating.score}/10`);
-    lines.push('');
-    lines.push('**Анализ:**');
-    lines.push('');
-    lines.push(comparison.rating.analysis);
-    lines.push('');
+  // Группируем оценки по ответам
+  if (mapping && mapping.length > 0) {
+    for (const mapInfo of mapping) {
+      lines.push(`### Ответ ${mapInfo.anonymizedNumber} (${mapInfo.modelName} - ${mapInfo.modelLevel})`);
+      lines.push('');
+      
+      // Собираем оценки от всех моделей для этого ответа
+      const scores: string[] = [];
+      let totalScore = 0;
+      let count = 0;
+      
+      for (const comparison of report.comparisons) {
+        const rating = comparison.ratings.find(r => r.responseNumber === mapInfo.anonymizedNumber);
+        if (rating) {
+          scores.push(`- **${comparison.modelName}:** ${rating.score}/10`);
+          totalScore += rating.score;
+          count++;
+        }
+      }
+      
+      if (count > 0) {
+        lines.push(`**Средняя оценка:** ${(totalScore / count).toFixed(1)}/10`);
+        lines.push('');
+        lines.push('**Оценки от моделей:**');
+        lines.push('');
+        lines.push(scores.join('\n'));
+        lines.push('');
+      }
+      
+      lines.push('**Детальные анализы:**');
+      lines.push('');
+      
+      for (const comparison of report.comparisons) {
+        const rating = comparison.ratings.find(r => r.responseNumber === mapInfo.anonymizedNumber);
+        if (rating) {
+          lines.push(`#### От ${comparison.modelName}`);
+          lines.push('');
+          lines.push(rating.analysis);
+          lines.push('');
+        }
+      }
+      
+      lines.push('---');
+      lines.push('');
+    }
+  } else {
+    // Fallback - старый формат без маппинга
+    for (const comparison of report.comparisons) {
+      lines.push(`### Оценка от ${comparison.modelName}`);
+      lines.push('');
+      for (const rating of comparison.ratings) {
+        lines.push(`**Ответ ${rating.responseNumber}:** ${rating.score}/10`);
+        lines.push('');
+        lines.push(rating.analysis);
+        lines.push('');
+      }
+    }
   }
   
   // Итоговый вывод
@@ -111,7 +159,7 @@ function createMetricsTable(responses: ModelResponse[]): string {
 /**
  * Сохранить отчёт в файл
  */
-export async function saveReport(report: Report, outputDir: string): Promise<string> {
+export async function saveReport(report: Report, outputDir: string, mapping?: AnonymizationMapping[]): Promise<string> {
   // Создаём директорию, если не существует
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -123,7 +171,7 @@ export async function saveReport(report: Report, outputDir: string): Promise<str
   const filepath = path.join(outputDir, filename);
   
   // Генерируем и сохраняем отчёт
-  const markdown = generateMarkdownReport(report);
+  const markdown = generateMarkdownReport(report, mapping);
   fs.writeFileSync(filepath, markdown, 'utf-8');
   
   return filepath;

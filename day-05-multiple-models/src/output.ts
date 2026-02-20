@@ -2,7 +2,7 @@
  * Модуль для вывода в консоль
  */
 
-import { ModelResponse, ModelComparison, FinalConclusion, Report } from './types';
+import { ModelResponse, ModelComparison, FinalConclusion, Report, AnonymizationMapping } from './types';
 import { formatCost, formatTime, formatTokens } from './metrics';
 
 const SEPARATOR = '═'.repeat(60);
@@ -33,10 +33,20 @@ export function printModelResponse(response: ModelResponse): void {
 /**
  * Вывести оценку от модели
  */
-export function printComparison(comparison: ModelComparison): void {
+export function printComparison(comparison: ModelComparison, mapping: AnonymizationMapping[]): void {
   printHeader(`ОЦЕНКА ОТ МОДЕЛИ: ${comparison.modelName}`);
-  console.log(comparison.rating.analysis);
-  console.log(`${SEPARATOR}\n`);
+  
+  // Выводим оценки для каждого ответа с указанием реальной модели
+  for (const rating of comparison.ratings) {
+    const modelInfo = mapping.find(m => m.anonymizedNumber === rating.responseNumber);
+    const modelLabel = modelInfo ? `${modelInfo.modelName} (${modelInfo.modelLevel})` : `Ответ ${rating.responseNumber}`;
+    
+    console.log(`\n📌 Ответ ${rating.responseNumber} (${modelLabel}):`);
+    console.log(`   Оценка: ${rating.score}/10`);
+    console.log(`   Анализ: ${rating.analysis.substring(0, 200)}${rating.analysis.length > 200 ? '...' : ''}`);
+  }
+  
+  console.log(`\n${SEPARATOR}\n`);
 }
 
 /**

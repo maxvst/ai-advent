@@ -55,12 +55,42 @@ export interface ComparisonRating {
   analysis: string;   // Текстовый анализ
 }
 
+/**
+ * Оценка одного ответа от модели-оценщика
+ */
+export interface ResponseRating {
+  responseNumber: number;  // Номер анонимного ответа (1, 2, 3)
+  score: number;           // Оценка от 1 до 10
+  analysis: string;        // Анализ ответа
+}
+
+/**
+ * Результат сравнения от одной модели-оценщика
+ * Содержит оценки всех трёх ответов
+ */
 export interface ModelComparison {
   modelId: string;
   modelName: string;
   modelLevel: ModelLevel;
-  responseNumber: number;  // Номер ответа (1, 2, 3) - для анонимности
-  rating: ComparisonRating;
+  ratings: ResponseRating[];  // Оценки для всех трёх ответов
+}
+
+/**
+ * Маппинг между анонимными номерами и реальными моделями
+ */
+export interface AnonymizationMapping {
+  anonymizedNumber: number;  // Номер в анонимизированном списке (1, 2, 3)
+  modelId: string;           // ID реальной модели
+  modelName: string;         // Имя реальной модели
+  modelLevel: ModelLevel;    // Уровень модели
+}
+
+/**
+ * Результат анонимизации с маппингом
+ */
+export interface AnonymizationResult {
+  responses: AnonymizedResponse[];  // Анонимизированные ответы
+  mapping: AnonymizationMapping[];  // Маппинг для восстановления
 }
 
 // ==================== Итоговый отчёт ====================
