@@ -9,7 +9,7 @@
  * 5. Сохраняет результаты в Markdown
  */
 
-import { loadConfig } from './config';
+import { loadConfig } from './config/index';
 import { runComparison, runComparisonSafe } from './orchestrator';
 import { error } from './output';
 

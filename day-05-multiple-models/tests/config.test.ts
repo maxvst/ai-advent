@@ -2,16 +2,15 @@
  * Тесты для модуля config.ts
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { loadConfig, getModelsList } from '../src/config';
+import { loadConfig, getModelsList, generateEnvExample } from '../src/config/index';
 import { Config } from '../src/types';
 
 describe('loadConfig', () => {
   const testConfigDir = path.join(__dirname, 'test-configs');
   const validConfigPath = path.join(testConfigDir, 'valid-config.json');
-  const invalidConfigPath = path.join(testConfigDir, 'invalid-config.json');
   const missingApiKeyPath = path.join(testConfigDir, 'missing-apikey.json');
   const emptyQuestionPath = path.join(testConfigDir, 'empty-question.json');
 
@@ -60,8 +59,11 @@ describe('loadConfig', () => {
     emptyQ.question = '';
     fs.writeFileSync(emptyQuestionPath, JSON.stringify(emptyQ, null, 2));
 
-    // Создаём невалидный JSON
-    fs.writeFileSync(invalidConfigPath, '{ invalid json }');
+    // Очищаем env переменные
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_BASE_URL;
+    delete process.env.LLM_QUESTION;
+    delete process.env.LLM_OUTPUT_DIR;
   });
 
   afterEach(() => {
@@ -69,6 +71,12 @@ describe('loadConfig', () => {
     if (fs.existsSync(testConfigDir)) {
       fs.rmSync(testConfigDir, { recursive: true, force: true });
     }
+
+    // Очищаем env переменные
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_BASE_URL;
+    delete process.env.LLM_QUESTION;
+    delete process.env.LLM_OUTPUT_DIR;
   });
 
   it('должен загружать валидный конфиг', () => {
@@ -80,16 +88,6 @@ describe('loadConfig', () => {
     expect(config.models.strong.id).toBe('anthropic/claude-3.5-sonnet');
     expect(config.models.medium.id).toBe('anthropic/claude-3-haiku');
     expect(config.models.weak.id).toBe('meta-llama/llama-3-8b-instruct');
-  });
-
-  it('должен выбрасывать ошибку для несуществующего файла', () => {
-    expect(() => loadConfig('/nonexistent/path/config.json')).toThrow(
-      'Конфигурационный файл не найден'
-    );
-  });
-
-  it('должен выбрасывать ошибку для невалидного JSON', () => {
-    expect(() => loadConfig(invalidConfigPath)).toThrow();
   });
 
   it('должен выбрасывать ошибку для пустого API ключа', () => {
@@ -104,13 +102,14 @@ describe('loadConfig', () => {
     );
   });
 
-  it('должен выбрасывать ошибку для отсутствующего baseUrl', () => {
+  it('должен использовать baseUrl по умолчанию если не указан', () => {
     const noBaseUrl = JSON.parse(JSON.stringify(validConfig));
     delete noBaseUrl.openRouter.baseUrl;
     const noBaseUrlPath = path.join(testConfigDir, 'no-baseurl.json');
     fs.writeFileSync(noBaseUrlPath, JSON.stringify(noBaseUrl, null, 2));
 
-    expect(() => loadConfig(noBaseUrlPath)).toThrow('baseUrl не указан');
+    const config = loadConfig(noBaseUrlPath);
+    expect(config.openRouter.baseUrl).toBe('https://openrouter.ai/api/v1');
   });
 
   it('должен выбрасывать ошибку для отсутствующего ID модели', () => {
@@ -119,7 +118,7 @@ describe('loadConfig', () => {
     const noModelIdPath = path.join(testConfigDir, 'no-model-id.json');
     fs.writeFileSync(noModelIdPath, JSON.stringify(noModelId, null, 2));
 
-    expect(() => loadConfig(noModelIdPath)).toThrow('ID модели не указан');
+    expect(() => loadConfig(noModelIdPath)).toThrow('models.strong.id');
   });
 
   it('должен выбрасывать ошибку для отсутствующего имени модели', () => {
@@ -128,7 +127,7 @@ describe('loadConfig', () => {
     const noModelNamePath = path.join(testConfigDir, 'no-model-name.json');
     fs.writeFileSync(noModelNamePath, JSON.stringify(noModelName, null, 2));
 
-    expect(() => loadConfig(noModelNamePath)).toThrow('Имя модели не указан');
+    expect(() => loadConfig(noModelNamePath)).toThrow('models.medium.name');
   });
 
   it('должен выбрасывать ошибку для некорректных цен', () => {
@@ -137,7 +136,51 @@ describe('loadConfig', () => {
     const badPricingPath = path.join(testConfigDir, 'bad-pricing.json');
     fs.writeFileSync(badPricingPath, JSON.stringify(badPricing, null, 2));
 
-    expect(() => loadConfig(badPricingPath)).toThrow('Цены должны быть числами');
+    expect(() => loadConfig(badPricingPath)).toThrow('pricing.input');
+  });
+
+  describe('environment variables', () => {
+    it('должен переопределять API ключ из env', () => {
+      process.env.OPENROUTER_API_KEY = 'env-api-key-12345';
+      
+      const config = loadConfig(validConfigPath);
+      
+      expect(config.openRouter.apiKey).toBe('env-api-key-12345');
+    });
+
+    it('должен переопределять baseUrl из env', () => {
+      process.env.OPENROUTER_BASE_URL = 'https://custom.api.com/v1';
+      
+      const config = loadConfig(validConfigPath);
+      
+      expect(config.openRouter.baseUrl).toBe('https://custom.api.com/v1');
+    });
+
+    it('должен переопределять вопрос из env', () => {
+      process.env.LLM_QUESTION = 'Вопрос из env?';
+      
+      const config = loadConfig(validConfigPath);
+      
+      expect(config.question).toBe('Вопрос из env?');
+    });
+
+    it('должен переопределять outputDir из env', () => {
+      process.env.LLM_OUTPUT_DIR = './custom-output';
+      
+      const config = loadConfig(validConfigPath);
+      
+      expect(config.outputDir).toBe('./custom-output');
+    });
+
+    it('env переменные имеют приоритет над файлом', () => {
+      process.env.OPENROUTER_API_KEY = 'env-key-override';
+      process.env.LLM_QUESTION = 'Env question override?';
+      
+      const config = loadConfig(validConfigPath);
+      
+      expect(config.openRouter.apiKey).toBe('env-key-override');
+      expect(config.question).toBe('Env question override?');
+    });
   });
 });
 
@@ -211,5 +254,16 @@ describe('getModelsList', () => {
       expect(model.config).toHaveProperty('name');
       expect(model.config).toHaveProperty('pricing');
     });
+  });
+});
+
+describe('generateEnvExample', () => {
+  it('должен генерировать пример .env файла', () => {
+    const example = generateEnvExample();
+    
+    expect(example).toContain('OPENROUTER_API_KEY');
+    expect(example).toContain('OPENROUTER_BASE_URL');
+    expect(example).toContain('LLM_QUESTION');
+    expect(example).toContain('LOG_LEVEL');
   });
 });

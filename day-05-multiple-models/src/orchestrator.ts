@@ -9,14 +9,9 @@
  * 5. Генерация отчёта
  */
 
-import { Config, IApiClient, AnonymizationMapping } from './types';
+import { Config, IApiClient } from './types';
 import { IModelService, IComparisonService, IReportService, ILogger } from './services/interfaces';
-import { createApiClient } from './api';
-import { createModelService } from './services/ModelService';
-import { createComparisonService } from './services/ComparisonService';
-import { createReportService } from './services/ReportService';
-import { createLogger } from './logger';
-import { getModelsList } from './config';
+import { createContainer, IContainer, ContainerOptions } from './container';
 import { 
   printModelResponse, 
   printComparison, 
@@ -25,7 +20,7 @@ import {
   success, 
   stage 
 } from './output';
-import { PromptProvider } from './prompts/PromptProvider';
+import { getModelsList } from './config/index';
 
 /**
  * Результат сравнения моделей
@@ -42,6 +37,9 @@ export interface ComparisonResult {
 
 /**
  * Оркестратор процесса сравнения
+ * 
+ * Использует DI контейнер для получения сервисов,
+ * что упрощает тестирование и обеспечивает гибкость.
  */
 export class Orchestrator {
   private readonly modelService: IModelService;
@@ -49,19 +47,25 @@ export class Orchestrator {
   private readonly reportService: IReportService;
   private readonly logger: ILogger;
 
+  /**
+   * Создать оркестратор с DI контейнером
+   */
+  static create(config: Config, options?: ContainerOptions): Orchestrator {
+    const container = createContainer(config, options);
+    return new Orchestrator(config, container);
+  }
+
+  /**
+   * Создать оркестратор с готовым контейнером
+   */
   constructor(
     private readonly config: Config,
-    private readonly apiClient: IApiClient,
-    logger?: ILogger
+    private readonly container: IContainer
   ) {
-    this.logger = logger ?? createLogger();
-    this.modelService = createModelService(this.apiClient, this.logger);
-    this.comparisonService = createComparisonService(
-      this.apiClient,
-      new PromptProvider(),
-      this.logger
-    );
-    this.reportService = createReportService(this.logger);
+    this.modelService = container.modelService;
+    this.comparisonService = container.comparisonService;
+    this.reportService = container.reportService;
+    this.logger = container.logger;
   }
 
   /**
@@ -278,8 +282,7 @@ export class Orchestrator {
  * Запустить сравнение моделей
  */
 export async function runComparison(config: Config): Promise<ComparisonResult> {
-  const apiClient = createApiClient(config);
-  const orchestrator = new Orchestrator(config, apiClient);
+  const orchestrator = Orchestrator.create(config);
   return orchestrator.run();
 }
 
@@ -287,7 +290,6 @@ export async function runComparison(config: Config): Promise<ComparisonResult> {
  * Запустить сравнение моделей в безопасном режиме
  */
 export async function runComparisonSafe(config: Config): Promise<ComparisonResult> {
-  const apiClient = createApiClient(config);
-  const orchestrator = new Orchestrator(config, apiClient);
+  const orchestrator = Orchestrator.create(config);
   return orchestrator.runSafe();
 }

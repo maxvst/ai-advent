@@ -1,16 +1,14 @@
 /**
- * Тесты для модуля prompts.ts
+ * Тесты для PromptProvider
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  createComparisonPrompt,
-  createFinalConclusionPrompt,
-  parseAllRatings
-} from '../src/prompts';
+import { PromptProvider } from '../src/prompts/PromptProvider';
 import { ModelResponse, ModelComparison, AnonymizedResponse, AnonymizationMapping } from '../src/types';
 
-describe('createComparisonPrompt', () => {
+describe('PromptProvider.createComparisonPrompt', () => {
+  const provider = new PromptProvider();
+
   it('должен создавать промпт с вопросом и ответами', () => {
     const question = 'Тестовый вопрос?';
     const responses: AnonymizedResponse[] = [
@@ -19,7 +17,7 @@ describe('createComparisonPrompt', () => {
       { number: 3, content: 'Третий ответ' }
     ];
 
-    const prompt = createComparisonPrompt(question, responses);
+    const prompt = provider.createComparisonPrompt(question, responses);
 
     expect(prompt).toContain('Тестовый вопрос?');
     expect(prompt).toContain('Ответ 1');
@@ -36,7 +34,7 @@ describe('createComparisonPrompt', () => {
       { number: 1, content: 'Ответ' }
     ];
 
-    const prompt = createComparisonPrompt(question, responses);
+    const prompt = provider.createComparisonPrompt(question, responses);
 
     expect(prompt).toContain('Оцените каждый ответ');
     expect(prompt).toContain('от 1 до 10');
@@ -51,7 +49,7 @@ describe('createComparisonPrompt', () => {
       { number: 1, content: 'Ответ' }
     ];
 
-    const prompt = createComparisonPrompt(question, responses);
+    const prompt = provider.createComparisonPrompt(question, responses);
 
     expect(prompt).toContain('### Ответ');
     expect(prompt).toContain('Оценка:');
@@ -59,7 +57,9 @@ describe('createComparisonPrompt', () => {
   });
 });
 
-describe('createFinalConclusionPrompt', () => {
+describe('PromptProvider.createFinalConclusionPrompt', () => {
+  const provider = new PromptProvider();
+
   const createMockResponse = (
     id: string,
     name: string,
@@ -97,7 +97,7 @@ describe('createFinalConclusionPrompt', () => {
       { anonymizedNumber: 2, modelId: 'model-2', modelName: 'Model Two', modelLevel: 'medium' }
     ];
 
-    const prompt = createFinalConclusionPrompt(question, responses, comparisons, mapping);
+    const prompt = provider.createFinalConclusionPrompt(question, responses, comparisons, mapping);
 
     expect(prompt).toContain('Тестовый вопрос?');
     expect(prompt).toContain('Model One');
@@ -116,7 +116,7 @@ describe('createFinalConclusionPrompt', () => {
       { anonymizedNumber: 1, modelId: 'model-1', modelName: 'Model One', modelLevel: 'strong' }
     ];
 
-    const prompt = createFinalConclusionPrompt(question, responses, comparisons, mapping);
+    const prompt = provider.createFinalConclusionPrompt(question, responses, comparisons, mapping);
 
     expect(prompt).toContain('Время ответа:');
     expect(prompt).toContain('Токены:');
@@ -140,7 +140,7 @@ describe('createFinalConclusionPrompt', () => {
       { anonymizedNumber: 2, modelId: 'model-2', modelName: 'Model Two', modelLevel: 'weak' }
     ];
 
-    const prompt = createFinalConclusionPrompt(question, responses, comparisons, mapping);
+    const prompt = provider.createFinalConclusionPrompt(question, responses, comparisons, mapping);
 
     expect(prompt).toContain('Оценки качества');
     expect(prompt).toContain('Средняя оценка');
@@ -158,7 +158,7 @@ describe('createFinalConclusionPrompt', () => {
       { anonymizedNumber: 1, modelId: 'model-1', modelName: 'Model One', modelLevel: 'strong' }
     ];
 
-    const prompt = createFinalConclusionPrompt(question, responses, comparisons, mapping);
+    const prompt = provider.createFinalConclusionPrompt(question, responses, comparisons, mapping);
 
     expect(prompt).toContain('Какая модель показала наиболее качественный ответ');
     expect(prompt).toContain('соотношение качество/стоимость');
@@ -166,7 +166,9 @@ describe('createFinalConclusionPrompt', () => {
   });
 });
 
-describe('parseAllRatings', () => {
+describe('PromptProvider.parseAllRatings', () => {
+  const provider = new PromptProvider();
+
   it('должен парсить оценки из корректного ответа', () => {
     const content = `
 ### Ответ 1
@@ -182,7 +184,7 @@ describe('parseAllRatings', () => {
 - Анализ: Отличный ответ!
     `;
 
-    const ratings = parseAllRatings(content);
+    const ratings = provider.parseAllRatings(content);
 
     expect(ratings.size).toBe(3);
     expect(ratings.get(1)?.score).toBe(8);
@@ -202,7 +204,7 @@ describe('parseAllRatings', () => {
 -Анализ: Слабый ответ
     `;
 
-    const ratings = parseAllRatings(content);
+    const ratings = provider.parseAllRatings(content);
 
     expect(ratings.size).toBe(2);
     expect(ratings.get(1)?.score).toBe(7);
@@ -212,7 +214,7 @@ describe('parseAllRatings', () => {
   it('должен возвращать пустую Map для ответа без оценок', () => {
     const content = 'Это просто текст без оценок';
     
-    const ratings = parseAllRatings(content);
+    const ratings = provider.parseAllRatings(content);
     
     expect(ratings.size).toBe(0);
   });
@@ -230,7 +232,7 @@ describe('parseAllRatings', () => {
 - Анализ: Короткий анализ.
     `;
 
-    const ratings = parseAllRatings(content);
+    const ratings = provider.parseAllRatings(content);
 
     expect(ratings.size).toBe(2);
     expect(ratings.get(1)?.analysis).toContain('длинный анализ');
@@ -248,7 +250,7 @@ describe('parseAllRatings', () => {
 - анализ: Тест 2
     `;
 
-    const ratings = parseAllRatings(content);
+    const ratings = provider.parseAllRatings(content);
 
     expect(ratings.size).toBe(2);
     expect(ratings.get(1)?.score).toBe(7);

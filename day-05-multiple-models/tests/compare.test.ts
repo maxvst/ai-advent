@@ -1,12 +1,25 @@
 /**
- * Тесты для модуля compare.ts (фокус на анонимизации)
+ * Тесты для ComparisonService (фокус на анонимизации)
  */
 
-import { describe, it, expect } from 'vitest';
-import { anonymizeResponses } from '../src/compare';
-import { ModelResponse } from '../src/types';
+import { describe, it, expect, vi } from 'vitest';
+import { ComparisonService } from '../src/services/ComparisonService';
+import { IApiClient, ModelResponse } from '../src/types';
+import { IPromptProvider, ILogger } from '../src/services/interfaces';
 
-describe('anonymizeResponses', () => {
+describe('ComparisonService.anonymizeResponses', () => {
+  // Создаём моки
+  const mockApiClient: IApiClient = {} as IApiClient;
+  const mockPromptProvider: IPromptProvider = {} as IPromptProvider;
+  const mockLogger: ILogger = {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn()
+  };
+
+  const service = new ComparisonService(mockApiClient, mockPromptProvider, mockLogger);
+
   const createMockResponse = (
     id: string,
     name: string,
@@ -29,7 +42,7 @@ describe('anonymizeResponses', () => {
       createMockResponse('model-3', 'Model Three', 'weak', 'Ответ 3')
     ];
 
-    const result = anonymizeResponses(responses);
+    const result = service.anonymizeResponses(responses);
 
     expect(result.responses).toHaveLength(3);
     expect(result.mapping).toHaveLength(3);
@@ -42,7 +55,7 @@ describe('anonymizeResponses', () => {
       createMockResponse('model-3', 'Model Three', 'weak', 'Ответ 3')
     ];
 
-    const result = anonymizeResponses(responses);
+    const result = service.anonymizeResponses(responses);
 
     // Проверяем, что все модели есть в маппинге
     const modelIds = result.mapping.map(m => m.modelId);
@@ -64,7 +77,7 @@ describe('anonymizeResponses', () => {
       createMockResponse('model-3', 'Model Three', 'weak', 'Уникальный ответ 3')
     ];
 
-    const result = anonymizeResponses(responses);
+    const result = service.anonymizeResponses(responses);
 
     const contents = result.responses.map(r => r.content);
     expect(contents).toContain('Уникальный ответ 1');
@@ -79,7 +92,7 @@ describe('anonymizeResponses', () => {
       createMockResponse('model-3', 'Model Three', 'weak', 'Ответ 3')
     ];
 
-    const result = anonymizeResponses(responses);
+    const result = service.anonymizeResponses(responses);
 
     const numbers = result.responses.map(r => r.number);
     expect(numbers).toContain(1);
@@ -98,7 +111,7 @@ describe('anonymizeResponses', () => {
         createMockResponse('weak-id', 'Weak', 'weak', 'W')
       ];
 
-      const result = anonymizeResponses(responses);
+      const result = service.anonymizeResponses(responses);
       const order = result.mapping.map(m => m.modelLevel).join('-');
       orders.push(order);
     }
@@ -115,7 +128,7 @@ describe('anonymizeResponses', () => {
       createMockResponse('model-3', 'Model Three', 'weak', 'Ответ weak')
     ];
 
-    const result = anonymizeResponses(responses);
+    const result = service.anonymizeResponses(responses);
 
     // Для каждого анонимного номера должен быть соответствующий маппинг
     for (const response of result.responses) {
@@ -132,7 +145,7 @@ describe('anonymizeResponses', () => {
       createMockResponse('model-1', 'Model One', 'strong', 'Один ответ')
     ];
 
-    const result = anonymizeResponses(responses);
+    const result = service.anonymizeResponses(responses);
 
     expect(result.responses).toHaveLength(1);
     expect(result.mapping).toHaveLength(1);
@@ -143,7 +156,7 @@ describe('anonymizeResponses', () => {
   it('должен работать с пустым массивом', () => {
     const responses: ModelResponse[] = [];
 
-    const result = anonymizeResponses(responses);
+    const result = service.anonymizeResponses(responses);
 
     expect(result.responses).toHaveLength(0);
     expect(result.mapping).toHaveLength(0);
