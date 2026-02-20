@@ -4,7 +4,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { Report, ModelResponse, ModelComparison, AnonymizationMapping } from './types';
+import { Report, ModelResponse, ModelComparison, AnonymizationMapping, FinalConclusion } from './types';
 import { formatCost, formatTime, formatTokens, calculateSummary } from './metrics';
 
 /**
@@ -213,7 +213,7 @@ export function createReport(
   question: string,
   responses: ModelResponse[],
   comparisons: ModelComparison[],
-  finalConclusion: import('./types').FinalConclusion
+  finalConclusion: FinalConclusion
 ): Report {
   const report: Report = {
     timestamp: new Date().toISOString(),

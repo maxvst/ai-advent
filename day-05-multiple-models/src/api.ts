@@ -92,9 +92,15 @@ export class ApiClient {
    */
   extractContent(response: OpenAI.Chat.Completions.ChatCompletion): string {
     if (!response.choices || response.choices.length === 0) {
-      throw new Error('Пустой ответ от API');
+      throw new Error('Пустой ответ от API: отсутствуют choices');
     }
-    return response.choices[0].message.content ?? '';
+    
+    const content = response.choices[0].message.content;
+    if (!content || content.trim().length === 0) {
+      throw new Error('Модель вернула пустой ответ');
+    }
+    
+    return content;
   }
 
   /**

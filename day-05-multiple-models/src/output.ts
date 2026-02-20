@@ -2,11 +2,30 @@
  * Модуль для вывода в консоль
  */
 
-import { ModelResponse, ModelComparison, FinalConclusion, Report, AnonymizationMapping } from './types';
+import { ModelResponse, ModelComparison, FinalConclusion, Report, AnonymizationMapping, TokenUsage } from './types';
 import { formatCost, formatTime, formatTokens } from './metrics';
 
 const SEPARATOR = '═'.repeat(60);
 const SUB_SEPARATOR = '─'.repeat(60);
+
+/**
+ * Форматировать метрики модели для вывода
+ */
+export function formatModelMetrics(usage: TokenUsage, responseTimeMs: number, cost: number): string[] {
+  return [
+    `   ⏱️  Время: ${formatTime(responseTimeMs)}`,
+    `   📊 Токены: ${formatTokens(usage.inputTokens)} input, ${formatTokens(usage.outputTokens)} output`,
+    `   💰 Стоимость: ${formatCost(cost)}`
+  ];
+}
+
+/**
+ * Вывести метрики модели в консоль
+ */
+export function printModelMetrics(usage: TokenUsage, responseTimeMs: number, cost: number): void {
+  const lines = formatModelMetrics(usage, responseTimeMs, cost);
+  lines.forEach(line => console.log(line));
+}
 
 /**
  * Вывести заголовок
@@ -22,9 +41,7 @@ export function printHeader(title: string): void {
  */
 export function printModelResponse(response: ModelResponse): void {
   printHeader(`ОТВЕТ ${response.modelLevel.toUpperCase()} МОДЕЛИ: ${response.modelName}`);
-  console.log(`   ⏱️  Время: ${formatTime(response.responseTimeMs)}`);
-  console.log(`   📊 Токены: ${formatTokens(response.usage.inputTokens)} input, ${formatTokens(response.usage.outputTokens)} output`);
-  console.log(`   💰 Стоимость: ${formatCost(response.cost)}`);
+  printModelMetrics(response.usage, response.responseTimeMs, response.cost);
   console.log(SUB_SEPARATOR);
   console.log(response.content);
   console.log(`${SEPARATOR}\n`);
@@ -74,9 +91,7 @@ export function printSummary(report: Report): void {
   
   for (const response of report.responses) {
     console.log(`\n🔹 ${response.modelName} (${response.modelLevel})`);
-    console.log(`   ⏱️  Время: ${formatTime(response.responseTimeMs)}`);
-    console.log(`   📊 Токены: ${formatTokens(response.usage.inputTokens)} input, ${formatTokens(response.usage.outputTokens)} output`);
-    console.log(`   💰 Стоимость: ${formatCost(response.cost)}`);
+    printModelMetrics(response.usage, response.responseTimeMs, response.cost);
   }
   
   console.log('\n' + SEPARATOR);
