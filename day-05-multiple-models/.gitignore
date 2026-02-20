@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Compiled output
+dist/
+
+# Config with secrets
+config.json
+
+# Results (keep directory but ignore contents)
+results/*.md
+!results/.gitkeep
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local

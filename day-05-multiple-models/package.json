@@ -1,0 +1,22 @@
+{
+  "name": "day-05-multiple-models",
+  "version": "1.0.0",
+  "description": "Программа для сравнения качества ответов LLM моделей разного уровня",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "ts-node src/index.ts",
+    "start:compiled": "node dist/index.js"
+  },
+  "dependencies": {
+    "openai": "^4.104.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}
