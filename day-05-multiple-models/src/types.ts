@@ -41,7 +41,7 @@ export interface TokenUsage {
 export interface ModelResponse {
   modelId: string;
   modelName: string;
-  modelLevel: 'strong' | 'medium' | 'weak';
+  modelLevel: ModelLevel;
   content: string;
   usage: TokenUsage;
   responseTimeMs: number;
@@ -58,7 +58,7 @@ export interface ComparisonRating {
 export interface ModelComparison {
   modelId: string;
   modelName: string;
-  modelLevel: 'strong' | 'medium' | 'weak';
+  modelLevel: ModelLevel;
   responseNumber: number;  // Номер ответа (1, 2, 3) - для анонимности
   rating: ComparisonRating;
 }
@@ -91,28 +91,6 @@ export interface Report {
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
-}
-
-export interface OpenRouterRequest {
-  model: string;
-  messages: ChatMessage[];
-}
-
-export interface OpenRouterResponse {
-  id: string;
-  choices: Array<{
-    message: {
-      role: string;
-      content: string;
-    };
-    finish_reason: string;
-  }>;
-  usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-  model: string;
 }
 
 // ==================== Утилиты ====================

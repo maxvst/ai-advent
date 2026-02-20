@@ -130,11 +130,12 @@ export async function saveReport(report: Report, outputDir: string): Promise<str
 }
 
 /**
- * Вывести отчёт в консоль
+ * Вывести итоговую статистику в консоль
+ * (ответы и оценки уже выведены по мере получения)
  */
 export function printReport(report: Report): void {
   console.log('\n' + '='.repeat(80));
-  console.log('                    СРАВНЕНИЕ LLM МОДЕЛЕЙ');
+  console.log('                    📈 ИТОГОВАЯ СТАТИСТИКА');
   console.log('='.repeat(80));
   console.log(`\n📅 Дата: ${report.timestamp}`);
   console.log(`\n❓ Вопрос: ${report.question}`);
@@ -150,34 +151,7 @@ export function printReport(report: Report): void {
     console.log(`   💰 Стоимость: ${formatCost(response.cost)}`);
   }
   
-  console.log('\n' + '-'.repeat(80));
-  console.log('📝 ОТВЕТЫ МОДЕЛЕЙ');
-  console.log('-'.repeat(80));
-  
-  for (const response of report.responses) {
-    console.log(`\n${'─'.repeat(40)}`);
-    console.log(`📌 ${response.modelName}:`);
-    console.log(`${'─'.repeat(40)}`);
-    console.log(response.content);
-  }
-  
-  console.log('\n' + '-'.repeat(80));
-  console.log('⭐ ОЦЕНКИ КАЧЕСТВА');
-  console.log('-'.repeat(80));
-  
-  for (const comparison of report.comparisons) {
-    console.log(`\n🔹 Оценка от ${comparison.modelName}: ${comparison.rating.score}/10`);
-    console.log(`   ${comparison.rating.analysis}`);
-  }
-  
-  console.log('\n' + '-'.repeat(80));
-  console.log('🏆 ИТОГОВЫЙ ВЫВОД (от сильной модели)');
-  console.log('-'.repeat(80));
-  console.log('\n' + report.finalConclusion.content);
-  
   console.log('\n' + '='.repeat(80));
-  console.log('📈 ИТОГОВАЯ СТАТИСТИКА');
-  console.log('='.repeat(80));
   console.log(`   💰 Общая стоимость: ${formatCost(report.summary.totalCost)}`);
   console.log(`   ⏱️  Общее время: ${formatTime(report.summary.totalTimeMs)}`);
   console.log(`   📊 Всего токенов: ${formatTokens(report.summary.totalInputTokens)} input, ${formatTokens(report.summary.totalOutputTokens)} output`);
