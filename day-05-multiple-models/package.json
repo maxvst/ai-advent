@@ -10,14 +10,19 @@
     "build": "tsc",
     "start": "ts-node src/index.ts",
     "start:mock": "USE_MOCK_API=true ts-node src/index.ts",
-    "start:compiled": "node dist/index.js"
+    "start:compiled": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "openai": "^4.104.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^4.0.18",
     "ts-node": "^10.9.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.18"
   }
 }
