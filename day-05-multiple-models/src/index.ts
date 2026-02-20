@@ -9,136 +9,38 @@
  * 5. Сохраняет результаты в Markdown
  */
 
-import { Config, ModelResponse, ModelComparison, ModelConfig, AnonymizationResult, IApiClient } from './types';
-import { loadConfig, getModelsList } from './config';
-import { ApiClient, createApiClient } from './api';
-import { getModelResponse, anonymizeResponses, getModelComparison, getFinalConclusion } from './compare';
-import { createReport, saveReport, printReport } from './report';
-import { 
-  printModelResponse, 
-  printComparison, 
-  printFinalConclusion,
-  info, 
-  success, 
-  error, 
-  stage 
-} from './output';
-
-/**
- * Обработать одну модель - получить и вывести ответ
- */
-async function processModel(
-  apiClient: IApiClient,
-  modelConfig: ModelConfig,
-  level: 'strong' | 'medium' | 'weak',
-  question: string
-): Promise<ModelResponse> {
-  info(`Отправка запроса ${level} модели (${modelConfig.name})...`);
-  
-  const response = await getModelResponse(apiClient, modelConfig, level, question);
-  
-  printModelResponse(response);
-  
-  return response;
-}
-
-/**
- * Получить сравнения от всех моделей
- */
-async function processComparisons(
-  apiClient: IApiClient,
-  config: Config,
-  responses: ModelResponse[],
-  anonymizationResult: AnonymizationResult
-): Promise<ModelComparison[]> {
-  const comparisons: ModelComparison[] = [];
-  const models = getModelsList(config);
-  
-  for (const model of models) {
-    info(`Получение оценки от ${model.config.name}...`);
-    
-    const comparison = await getModelComparison(
-      apiClient,
-      model.config,
-      model.level,
-      config.question,
-      anonymizationResult.responses
-    );
-    
-    printComparison(comparison, anonymizationResult.mapping);
-    
-    comparisons.push(comparison);
-  }
-  
-  return comparisons;
-}
+import { loadConfig } from './config';
+import { runComparison, runComparisonSafe } from './orchestrator';
+import { error } from './output';
 
 /**
  * Главная функция
  */
 async function main(): Promise<void> {
   console.log('🚀 Запуск сравнения LLM моделей...\n');
-  
+
   try {
-    // 1. Загружаем конфигурацию
-    stage('📁', 'Загрузка конфигурации...');
+    // Загружаем конфигурацию
     const config = loadConfig();
-    
-    // 2. Инициализируем API клиент
-    stage('🔌', 'Инициализация API клиента...');
-    const apiClient = createApiClient(config);
-    
-    // 3. Получаем ответы от всех моделей
-    stage('📝', 'Отправка вопроса моделям...');
-    console.log(`   Вопрос: ${config.question}\n`);
-    
-    const responses: ModelResponse[] = [];
-    const models = getModelsList(config);
-    
-    for (const model of models) {
-      const response = await processModel(
-        apiClient,
-        model.config,
-        model.level,
-        config.question
-      );
-      responses.push(response);
+
+    // Запускаем сравнение
+    // Используем безопасный режим для graceful degradation
+    const result = await runComparisonSafe(config);
+
+    if (!result.success) {
+      error(result.error?.message ?? 'Неизвестная ошибка');
+      process.exit(1);
     }
-    
-    // 4. Анонимизируем ответы
-    stage('🔒', 'Анонимизация ответов...');
-    const anonymizationResult = anonymizeResponses(responses);
-    
-    // 5. Получаем сравнение от каждой модели
-    stage('📊', 'Получение оценок качества...');
-    const comparisons = await processComparisons(apiClient, config, responses, anonymizationResult);
-    
-    // 6. Получаем итоговый вывод от сильной модели
-    stage('🏆', 'Получение итогового вывода от сильной модели...');
-    const finalConclusion = await getFinalConclusion(
-      apiClient,
-      config.models.strong,
-      config.question,
-      responses,
-      comparisons,
-      anonymizationResult.mapping
-    );
-    
-    printFinalConclusion(finalConclusion);
-    
-    // 7. Создаём отчёт
-    stage('📄', 'Генерация отчёта...');
-    const report = createReport(config.question, responses, comparisons, finalConclusion);
-    
-    // 8. Выводим итоговую статистику
-    printReport(report);
-    
-    // 9. Сохраняем в файл
-    const savedPath = await saveReport(report, config.outputDir, anonymizationResult.mapping);
-    success(`Отчёт сохранён: ${savedPath}`);
-    
-    console.log('\n✨ Сравнение завершено успешно!\n');
-    
+
+    // Если были частичные результаты, выводим информацию
+    if (result.partialResults) {
+      console.log(
+        `\nℹ️  Обработка завершена с частичными результатами: ` +
+        `${result.partialResults.responsesCount} ответов, ` +
+        `${result.partialResults.comparisonsCount} оценок`
+      );
+    }
+
   } catch (err) {
     error(err instanceof Error ? err.message : String(err));
     process.exit(1);
