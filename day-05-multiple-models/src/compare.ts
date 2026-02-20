@@ -126,8 +126,14 @@ export async function getModelComparison(
   
   // Преобразуем в массив ResponseRating
   const ratings: ResponseRating[] = [];
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 1; i <= anonymizedResponses.length; i++) {
     const parsed = parsedRatings.get(i);
+    
+    // Предупреждение при неудачном парсинге
+    if (!parsed) {
+      console.warn(`⚠️  Не удалось распарсить оценку для Ответа ${i} от модели ${modelConfig.name}`);
+    }
+    
     ratings.push({
       responseNumber: i,
       score: parsed?.score ?? 0,
