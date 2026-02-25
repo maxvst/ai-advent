@@ -1,0 +1,6 @@
+{
+  "apiBaseUrl": "https://openrouter.ai/api/v1",
+  "model": "deepseek/deepseek-v3.2",
+  "apiKey": "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",
+  "temperature": 0.7
+}
