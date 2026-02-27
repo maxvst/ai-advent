@@ -1,11 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ChatMessage, SummaryData, HistoryError } from '../types';
+import { ChatMessage, SummaryData, HistoryError, TokenUsage } from '../types';
 import { OpenAIClient } from '../api';
 import { logger } from '../utils/logger';
 
 const SUMMARY_FILE = 'chat-summary.json';
-const SUMMARY_BATCH_SIZE = 10; // Количество сообщений для накопления перед генерацией саммари
+const SUMMARY_BATCH_SIZE = 20; // Количество сообщений для накопления перед генерацией саммари
 
 /**
  * Загружает саммари из файла
@@ -78,7 +78,7 @@ export function needsSummaryGeneration(
 ): boolean {
   const messagesBeyondRecent = totalMessageCount - recentMessagesCount;
   // Проверяем, достаточно ли накопилось сообщений (минимум 10 сверх N)
-  return messagesBeyondRecent >= SUMMARY_BATCH_SIZE*2;
+  return messagesBeyondRecent >= SUMMARY_BATCH_SIZE;
 }
 
 /**
@@ -88,7 +88,7 @@ export async function generateSummary(
   messages: ChatMessage[],
   client: OpenAIClient,
   onSummaryStart?: () => void
-): Promise<string> {
+): Promise<[string, TokenUsage]> {
   logger.info(`Генерация саммари из ${messages.length} сообщений`);
   
   if (onSummaryStart) {
@@ -117,7 +117,7 @@ ${messages.map((m, i) => `${i + 1}. [${m.role}]: ${m.content}`).join('\n\n')}
   
   logger.info(`Саммари сгенерировано: ${tokenUsage.totalTokens} токенов`);
 
-  return summary;
+  return [summary, tokenUsage];
 }
 
 /**
@@ -128,7 +128,7 @@ export async function mergeSummaryWithNewMessages(
   newMessages: ChatMessage[],
   client: OpenAIClient,
   onSummaryStart?: () => void
-): Promise<string> {
+): Promise<[string, TokenUsage]> {
   logger.info(`Объединение саммари с ${newMessages.length} новыми сообщениями`);
   
   if (onSummaryStart) {
@@ -159,12 +159,12 @@ ${newMessages.map((m, i) => `${i + 1}. [${m.role}]: ${m.content}`).join('\n\n')}
   
   logger.info(`Саммари обновлено: ${tokenUsage.totalTokens} токенов`);
 
-  return mergedSummary;
+  return [mergedSummary, tokenUsage];
 }
 
 /**
  * Обрабатывает сообщения и при необходимости генерирует/обновляет саммари
- * Возвращает обновленные данные саммари
+ * Возвращает обновленные данные саммари и информацию о потраченных токенах
  */
 export async function processMessagesForSummary(
   recentMessages: ChatMessage[],
@@ -173,7 +173,7 @@ export async function processMessagesForSummary(
   client: OpenAIClient,
   recentMessagesCount: number,
   onSummaryStart?: () => void
-): Promise<{ summary: string; needsUpdate: boolean }> {
+): Promise<{ summary: string; needsUpdate: boolean; summaryTokenUsage?: TokenUsage }> {
   const totalMessageCount = allMessages.length;
   
   // Проверяем, нужно ли генерировать саммари
@@ -200,10 +200,11 @@ export async function processMessagesForSummary(
   }
   
   let newSummary: string;
+  let summaryTokenUsage: TokenUsage | undefined;
 
   if (currentSummary && currentSummary.length > 0 && messagesToAdd.length > 0) {
     // Объединяем текущее саммари с новым блоком
-    newSummary = await mergeSummaryWithNewMessages(
+    [newSummary, summaryTokenUsage] = await mergeSummaryWithNewMessages(
       currentSummary,
       messagesToAdd,
       client,
@@ -211,35 +212,49 @@ export async function processMessagesForSummary(
     );
   } else {
     // Генерируем первое саммари
-    newSummary = await generateSummary(
+    [newSummary, summaryTokenUsage] = await generateSummary(
       messagesToAdd,
       client,
       onSummaryStart
     );
   }
 
-  return { summary: newSummary, needsUpdate: true };
+  return { summary: newSummary, needsUpdate: true, summaryTokenUsage };
 }
 
 /**
- * Формирует контекст для LLM из саммари и последних сообщений
+ * Формирует контекст для LLM из саммари и всех сообщений истории
+ * Включает все сообщения, которые ещё не были саммаризированы
  */
 export function buildContextWithSummary(
-  recentMessages: ChatMessage[],
-  summary: string | null
+  allMessages: ChatMessage[],
+  summary: string | null,
+  recentMessagesCount: number = 10
 ): ChatMessage[] {
   const context: ChatMessage[] = [];
 
+  // Формируем system prompt с саммари (если есть)
+  const systemContent = `Ты - электронный дневник. Фиксируй утверждения и отвечай на вопросы основываясь исключительно на данных из данного диалога. Если в сообщении нет вопроса, отвечай максимально коротко.`
+    + ((summary && summary.length > 0) ? ` Это краткое саммари предыдущей части разговора:\n\n${summary}\n\nИспользуй эту информацию как контекст для ответа на текущие сообщения.`
+                                      : ` Запоминай все сообщения для дальнейшего контекста.`);
+
   context.push({
     role: 'system',
-    content: `Ты - электронный дневник. Фиксируй утверждения и отвечай на вопросы основываясь исключительно на данных из данного диалога. Если в сообщении нет вопроса, отвечай максимально коротко.`
-    + ((summary && summary.length > 0) ? ` Это краткое саммари предыдущей части разговора:\n\n${summary}\n\nИспользуй эту информацию как контекст для ответа на текущие сообщения.`
-                                      : ``),
+    content: systemContent,
     timestamp: new Date().toISOString()
   });
 
-  // Добавляем последние N сообщений
-  context.push(...recentMessages);
+  // Добавляем все сообщения из истории
+  // При наличии саммари добавляем только последние N сообщений (саммари уже содержит информацию о старых)
+  // При отсутствии саммари добавляем все сообщения
+  if (summary && summary.length > 0) {
+    // Если есть саммари, добавляем только последние сообщения
+    const recentMessages = allMessages.slice(-recentMessagesCount);
+    context.push(...recentMessages);
+  } else {
+    // Если нет саммари, добавляем все сообщения
+    context.push(...allMessages);
+  }
 
   return context;
 }

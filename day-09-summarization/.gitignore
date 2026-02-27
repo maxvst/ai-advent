@@ -26,3 +26,7 @@ config.json
 
 # Keep example config
 !config.example.json
+
+# Kilo Code
+.kilocode/
+plans/

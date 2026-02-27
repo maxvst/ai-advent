@@ -186,12 +186,16 @@ export class CLI {
       // Добавляем сообщение пользователя в историю
       this.history = addMessage(this.history, 'user', content);
       
-      // Получаем последние N сообщений
-      const recentMessagesCount = this.config.recentMessagesCount ?? 3;
-      const recentMessages = getRecentMessages(this.history, recentMessagesCount);
+      // Получаем все сообщения из истории (включая те, которые ещё не саммаризированы)
+      // Это гарантирует, что весь контекст передаётся в LLM
+      const allMessages = this.history.messages;
       
-      // Формируем контекст с саммари
-      const contextMessages = buildContextWithSummary(recentMessages, this.summary);
+      // Количество последних сообщений для включения в контекст при наличии саммари
+      const recentMessagesCount = this.config.recentMessagesCount ?? 10;
+      
+      // Формируем контекст - передаём все сообщения, чтобы LLM видел полную историю
+      // При наличии саммари - последние N сообщений, при отсутствии - все сообщения
+      const contextMessages = buildContextWithSummary(allMessages, this.summary, recentMessagesCount);
 
       // Отправляем сообщение и получаем ответ вместе с информацией о токенах
       const [response, tokenUsage] = await this.client.sendMessage(contextMessages);
@@ -206,6 +210,9 @@ export class CLI {
       this.history = addMessage(this.history, 'assistant', response);
 
       // Проверяем, нужно ли генерировать саммари
+      // Передаём последние N сообщений для определения необходимости саммаризации
+      const recentMessages = getRecentMessages(this.history, recentMessagesCount);
+      
       const result = await processMessagesForSummary(
         recentMessages,
         this.history.messages,
@@ -224,6 +231,12 @@ export class CLI {
           lastUpdated: new Date().toISOString()
         });
         console.log(chalk.green('\n✅ Саммари обновлено и сохранено'));
+        
+        // Добавляем токены саммаризации в общие счетчики
+        if (result.summaryTokenUsage) {
+          this.tokenStats.totalInputTokens += result.summaryTokenUsage.inputTokens;
+          this.tokenStats.totalOutputTokens += result.summaryTokenUsage.outputTokens;
+        }
         
         // Обрезаем историю - оставляем только последние N сообщений
         // после саммаризации старые сообщения больше не нужны в полном виде
